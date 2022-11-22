@@ -17,8 +17,8 @@ func main() {
 		"manu":   "4321",
 	}))
 
-	// /admin/secrets endpoint
-	// hit "localhost:8080/admin/secrets
+	// /user/user endpoint
+	// hit "localhost:8080/user/user
 	authorized.GET("/user", func(c *gin.Context) {
 		// get user, it was set by the BasicAuth middleware
 		user := c.MustGet(gin.AuthUserKey).(string)
