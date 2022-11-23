@@ -1,0 +1,2 @@
+curl -X POST http://localhost:8080/user/apply -F "upload[]=@test1.txt" -F "upload[]=@test2.txt" -H "Content-Type: multipart/form-data" -u "foo:bar" -F "name=Azan" -F "quotas[]=bpl" -F "quotas[]=phd"
+export $(xargs < .env)
