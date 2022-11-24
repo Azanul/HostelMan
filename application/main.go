@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
-	"path/filepath"
+	"strconv"
+
+	"github.com/google/uuid"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -66,16 +70,98 @@ func main() {
 			return
 		}
 		files := form.File["upload[]"]
-
+		var documents [][]byte
 		for _, file := range files {
-			filename := filepath.Base(file.Filename)
-			if err := ctx.SaveUploadedFile(file, "recieved_"+filename); err != nil {
-				ctx.String(http.StatusBadRequest, "upload file err: %s", err.Error())
-				return
+			reader, err := file.Open()
+			if err != nil {
+				panic(err)
 			}
+			document, err := io.ReadAll(reader)
+			if err != nil {
+				panic(err)
+			}
+			documents = append(documents, document)
+		}
+		collection := mongoClient.Database("University").Collection("Students")
+
+		formId := ctx.PostForm("formId")
+		if formId == "" {
+			formId = uuid.New().String()
 		}
 
-		ctx.String(http.StatusOK, "Uploaded successfully %d files with fields name=%s and email=%s.", len(files), user, form.Value["quotas[]"])
+		filter := bson.D{
+			{
+				Key: "forms",
+				Value: bson.D{
+					{
+						Key: "$elemMatch",
+						Value: bson.D{
+							{
+								Key:   "formId",
+								Value: formId,
+							},
+						},
+					},
+				},
+			},
+			{
+				Key:   "name",
+				Value: user,
+			},
+		}
+		update := bson.D{
+			{
+				Key: "$push",
+				Value: bson.D{
+					{
+						Key: "forms",
+						Value: bson.D{
+							{
+								Key:   "formId",
+								Value: formId,
+							},
+							{
+								Key:   "quotas",
+								Value: form.Value["quotas[]"],
+							},
+							{
+								Key:   "files",
+								Value: documents,
+							},
+							{
+								Key:   "status",
+								Value: "PENDING",
+							},
+						},
+					},
+				},
+			},
+		}
+		opts := options.Update().SetUpsert(true)
+
+		_, err = collection.UpdateOne(context.TODO(), filter, update, opts)
+		if err != nil {
+			panic(err)
+		}
+
+		ctx.String(http.StatusOK, "Application ID=%s.", formId)
+	})
+
+	r.GET("/download", func(ctx *gin.Context) {
+		collection := mongoClient.Database("University").Collection("Students")
+		formId := ctx.Query("formId")
+
+		filter := bson.D{{Key: "formId", Value: formId}}
+
+		var form bson.M
+		err := collection.FindOne(ctx, filter).Decode(&form)
+		if err != nil {
+			panic(err)
+		}
+
+		for i, doc := range form["files"].(bson.A) {
+			os.WriteFile("downloaded"+strconv.Itoa(i), doc.(primitive.Binary).Data, 0777)
+		}
 	})
 
 	r.Run(":8080") // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
