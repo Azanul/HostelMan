@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -89,57 +90,26 @@ func main() {
 			formId = uuid.New().String()
 		}
 
-		filter := bson.D{
-			{
-				Key: "forms",
-				Value: bson.D{
-					{
-						Key: "$elemMatch",
-						Value: bson.D{
-							{
-								Key:   "formId",
-								Value: formId,
-							},
-						},
-					},
-				},
+		filter := bson.M{
+			"forms": bson.M{
+				"$exists": formId,
 			},
-			{
-				Key:   "name",
-				Value: user,
-			},
+			"name": user,
 		}
-		update := bson.D{
-			{
-				Key: "$push",
-				Value: bson.D{
-					{
-						Key: "forms",
-						Value: bson.D{
-							{
-								Key:   "formId",
-								Value: formId,
-							},
-							{
-								Key:   "quotas",
-								Value: form.Value["quotas[]"],
-							},
-							{
-								Key:   "files",
-								Value: documents,
-							},
-							{
-								Key:   "status",
-								Value: "PENDING",
-							},
-						},
-					},
+		update := bson.M{
+			"$set": bson.M{
+				fmt.Sprintf("forms.%s", formId): bson.M{
+					"quotas":       form.Value["quotas[]"],
+					"files":        documents,
+					"status":       "SUBMITTED",
+					"submission":   time.Now().UTC().Format(time.RFC3339),
+					"verification": nil,
+					"payment":      nil,
 				},
 			},
 		}
-		opts := options.Update().SetUpsert(true)
 
-		_, err = collection.UpdateOne(context.TODO(), filter, update, opts)
+		_, err = collection.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
 			panic(err)
 		}
