@@ -2,10 +2,12 @@ use chrono::Utc;
 use kafka::consumer::{Consumer, FetchOffset};
 use mongodb::{
     bson::{doc, Document},
+    options::ClientOptions,
     sync::Client,
 };
-use std::env;
+
 use std::str;
+use urlencoding::encode;
 
 fn main() {
     let mongo_client = db_init();
@@ -16,7 +18,13 @@ fn main() {
 
     loop {
         for ms in kafka_consumer.poll().unwrap().iter() {
-            for m in ms.messages() {
+
+            let applications = ms.messages();
+            kafka_consumer.consume_messageset(ms).unwrap();
+            kafka_consumer.commit_consumed().unwrap();
+
+            for m in applications {
+                println!("{:?}", str::from_utf8(m.value).unwrap());
                 let (user, form_id) = str::from_utf8(m.value).unwrap().split_once(':').unwrap();
                 println!("{:?}", form_id);
                 student_collection
@@ -37,31 +45,28 @@ fn main() {
                     )
                     .unwrap();
             }
-            match kafka_consumer.consume_messageset(ms) {
-                Ok(number) => number,
-                Err(e) => println!("{:?}", e),
-            };
         }
-        match kafka_consumer.commit_consumed() {
-            Ok(number) => number,
-            Err(e) => println!("{:?}", e),
-        };
     }
 }
 
 fn db_init() -> Client {
-    // Path to certificate
-    let mongo_certificate = env::var("MONGODB_CERTIFICATE").unwrap();
+    let mut mongo_user = String::new();
+    let mut mongo_password = String::new();
+
+    // Take Username and Password from Verifier
+    std::io::stdin().read_line(&mut mongo_user).unwrap();
+    std::io::stdin().read_line(&mut mongo_password).unwrap();
 
     // MongoDB connection URI
-    let uri = "mongodb+srv://hosteldb.e3ayhyn.mongodb.net/?\
-         retryWrites=true&w=majority \
-         &authSource=%24external&authMechanism=MONGODB-X509&tlsCertificateKeyFile="
-        .to_owned()
-        + &mongo_certificate;
+    let uri = format!(
+        "mongodb+srv://{}:{}@hosteldb.e3ayhyn.mongodb.net/?retryWrites=true&w=majority",
+        encode(mongo_user.trim()),
+        encode(mongo_password.trim())
+    );
 
     // Get a handle to the cluster
-    let client = Client::with_uri_str(uri).unwrap();
+    let client_options = ClientOptions::parse(uri).unwrap();
+    let client = Client::with_options(client_options).unwrap();
 
     // Ping the server to see if you can connect to the cluster
     client
@@ -76,6 +81,7 @@ fn db_init() -> Client {
 fn queue_init() -> Consumer {
     Consumer::from_hosts(vec!["172.27.0.6:9092".to_owned()])
         .with_topic("test".to_owned())
+        .with_group("verifiers".to_owned())
         .with_fallback_offset(FetchOffset::Earliest)
         .create()
         .unwrap()

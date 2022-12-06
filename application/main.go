@@ -42,11 +42,6 @@ func main() {
 
 	kafkaTopic := Getenv("KAFKA_TOPIC", "test")
 
-	producerErr := PushCommentToQueue(kafkaTopic, []byte("123456"))
-	if producerErr != nil {
-		fmt.Println(producerErr)
-	}
-
 	// Group using gin.BasicAuth() middleware
 	authorized := r.Group("/user", gin.BasicAuth(gin.Accounts{
 		"foo":    "bar",
@@ -119,6 +114,11 @@ func main() {
 		_, err = collection.UpdateOne(context.TODO(), filter, update)
 		if err != nil {
 			panic(err)
+		}
+
+		producerErr := PushCommentToQueue(kafkaTopic, []byte(user+":"+formId))
+		if producerErr != nil {
+			fmt.Println(producerErr)
 		}
 
 		ctx.String(http.StatusOK, "Application ID=%s.", formId)
