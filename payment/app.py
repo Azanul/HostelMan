@@ -13,7 +13,7 @@
 
 import stripe
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 
 # This is your Stripe CLI webhook secret for testing your endpoint locally.
 endpoint_secret = (
@@ -21,6 +21,14 @@ endpoint_secret = (
 )
 
 app = Flask(__name__)
+
+@app.route("/complete", methods=["GET"])
+def get_form():
+    return render_template("form_entry.html")
+
+@app.route("/pay", methods=["POST"])
+def get_payment_intent():
+    return ""
 
 
 @app.route("/webhook", methods=["POST"])
