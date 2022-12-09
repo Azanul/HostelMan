@@ -6,11 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kafka = "0.9.0"
 chrono = "0.4.23"
+kafka = "0.9.0"
 urlencoding = "2.1.2"
-
 
 [dependencies.mongodb]
 version = "2.3.1"
 features = ["tokio-sync"]
+
+[dependencies.async-stripe]
+version = "0.15.0"
+default-features = false
+features = ["runtime-blocking"]

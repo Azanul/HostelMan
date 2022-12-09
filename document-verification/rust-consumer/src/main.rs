@@ -5,8 +5,10 @@ use mongodb::{
     options::ClientOptions,
     sync::Client,
 };
+use stripe::{Currency, PaymentIntent};
 
-use std::str;
+use std::env;
+use std::{collections::HashMap, str};
 use urlencoding::encode;
 
 fn main() {
@@ -15,10 +17,10 @@ fn main() {
         mongo_client.database("University").collection("Students");
 
     let mut kafka_consumer = queue_init();
+    let stripe_client = stripe::Client::new("sk_test_51L0tL5SJYv4HUS02q8sw8iaGzTrAifySQ3eluMsT3PHVCDJhZ7c0cD7h5nvcjgKKfonboUsP66zITCfJ890xxFhX00F4CGVgS7");
 
     loop {
         for ms in kafka_consumer.poll().unwrap().iter() {
-
             let applications = ms.messages();
             kafka_consumer.consume_messageset(ms).unwrap();
             kafka_consumer.commit_consumed().unwrap();
@@ -27,6 +29,14 @@ fn main() {
                 println!("{:?}", str::from_utf8(m.value).unwrap());
                 let (user, form_id) = str::from_utf8(m.value).unwrap().split_once(':').unwrap();
                 println!("{:?}", form_id);
+
+                let payment_intent = {
+                    let mut intent = stripe::CreatePaymentIntent::new(500, Currency::INR);
+                    intent.metadata =
+                        Some(HashMap::from([("formId".to_string(), form_id.to_string())]));
+                    PaymentIntent::create(&stripe_client, intent).unwrap()
+                };
+
                 student_collection
                     .update_one(
                         doc! {
@@ -39,6 +49,7 @@ fn main() {
                             "$set": {
                                 format!("forms.{form_id}.status"): "VERIFIED",
                                 format!("forms.{form_id}.verification"): Utc::now().to_rfc3339(),
+                                format!("forms.{form_id}.payment_ref"): format!("{}", payment_intent.id)
                             },
                         },
                         None,
@@ -50,12 +61,14 @@ fn main() {
 }
 
 fn db_init() -> Client {
-    let mut mongo_user = String::new();
-    let mut mongo_password = String::new();
+    let mut mongo_user = env::var("mongo_user").ok().unwrap();
+    let mut mongo_password = env::var("mongo_password").ok().unwrap();
 
     // Take Username and Password from Verifier
-    std::io::stdin().read_line(&mut mongo_user).unwrap();
-    std::io::stdin().read_line(&mut mongo_password).unwrap();
+    if mongo_user.is_empty() || mongo_password.is_empty() {
+        std::io::stdin().read_line(&mut mongo_user).unwrap();
+        std::io::stdin().read_line(&mut mongo_password).unwrap();
+    }
 
     // MongoDB connection URI
     let uri = format!(
