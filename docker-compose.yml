@@ -48,6 +48,25 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  application:
+    build:
+    depends_on:
+      - kafka-1
+      - kafka-2
+    ports:
+      - 8080:8080
+
+  rust-consumer:
+    build:
+    depends_on:
+      - kafka-1
+      - kafka-2
+
+  payment:
+    build:
+    ports:
+      - 4242:4242
+
 networks:
   default:
     name: hostelman_default
