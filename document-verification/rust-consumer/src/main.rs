@@ -7,8 +7,7 @@ use mongodb::{
 };
 use stripe::{Currency, PaymentIntent};
 
-use std::env;
-use std::{collections::HashMap, str};
+use std::{collections::HashMap, str, env, thread, time};
 use urlencoding::encode;
 
 fn main() {
@@ -92,6 +91,17 @@ fn db_init() -> Client {
 }
 
 fn queue_init() -> Consumer {
+    let mut consumer = Consumer::from_hosts(vec!["172.27.0.6:9092".to_owned()])
+        .with_topic("test".to_owned())
+        .create();
+
+    while consumer.is_err() {
+        consumer = Consumer::from_hosts(vec!["172.27.0.6:9092".to_owned()])
+            .with_topic("test".to_owned())
+            .create();
+            thread::sleep(time::Duration::from_secs(60));
+    }
+
     Consumer::from_hosts(vec!["172.27.0.6:9092".to_owned()])
         .with_topic("test".to_owned())
         .with_group("verifiers".to_owned())
