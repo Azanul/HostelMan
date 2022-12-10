@@ -49,7 +49,9 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   application:
-    build:
+    build: ./application
+    environment:
+      - MONGODB_CERTIFICATE=X509-cert-application.pem
     depends_on:
       - kafka-1
       - kafka-2
@@ -57,13 +59,18 @@ services:
       - 8080:8080
 
   rust-consumer:
-    build:
+    build: ./document-verification/rust-consumer
+    environment:
+      - mongo_user=verifier
+      - mongo_password=verify@1
     depends_on:
       - kafka-1
       - kafka-2
 
   payment:
-    build:
+    build: ./payment
+    environment:
+      - MONGODB_CERTIFICATE=X509-cert-application.pem
     ports:
       - 4242:4242
 
