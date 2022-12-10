@@ -19,10 +19,10 @@
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": [
-		"pip3 install --user -r requirements.txt", 
+		"pip install -r requirements.txt", 
 		"wget https://github.com/stripe/stripe-cli/releases/download/v1.13.6/stripe_1.13.6_linux_x86_64.tar.gz", 
 		"tar -xvf stripe_1.13.6_linux_x86_64.tar.gz",
-		"mv stripe ./usr/local/bin",
+		"mv stripe /usr/local/bin",
 		"rm stripe_1.13.6_linux_x86_64.tar.gz"
 	]
 
