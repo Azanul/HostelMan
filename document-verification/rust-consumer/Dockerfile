@@ -4,4 +4,4 @@ RUN apk add --no-cache gcc musl-dev linux-headers libressl-dev
 
 COPY . .
 RUN cargo build --release
-CMD ["./target/release/docker"]
+CMD ["cargo", "run", "--release"]
